@@ -1,11 +1,15 @@
 pipeline {
     agent any
 
+    environment {
+        IMAGE_NAME = "mounikavakacharlla/employee-api"
+        IMAGE_TAG = "v1.0"
+    }
+
     stages {
 
         stage('Checkout') {
             steps {
-                echo 'Checking out source code...'
                 checkout scm
             }
         }
@@ -30,20 +34,41 @@ pipeline {
             }
         }
 
-        stage('Build') {
+        stage('Build Docker Image') {
             steps {
-                echo 'Build completed successfully.'
+                sh '''
+                docker build -t $IMAGE_NAME:$IMAGE_TAG .
+                '''
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+
+                    sh '''
+                    echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+
+                    docker push $IMAGE_NAME:$IMAGE_TAG
+
+                    docker logout
+                    '''
+                }
             }
         }
     }
 
     post {
         success {
-            echo 'Pipeline executed successfully.'
+            echo "Docker image pushed successfully."
         }
 
         failure {
-            echo 'Pipeline failed.'
+            echo "Pipeline failed."
         }
     }
 }
